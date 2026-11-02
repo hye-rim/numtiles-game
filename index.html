@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>숫자 타일 게임</title>
+<style>
+  /* 아이폰 사파리: 버튼을 누르다 글자가 선택되거나 길게 눌러 복사 메뉴가 뜨지 않게 */
+  *, *::before, *::after { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body {
+    width:100%; height:100%; overflow:hidden; background:#0a1410;
+    font-family:-apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; color:#fff;
+    touch-action:none;
+  }
+  #stage { width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:6px 8px; }
+  #wrap { position:relative; background:#000; }
+  #game { display:block; touch-action:none; image-rendering:pixelated; }
+  #overlay { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; text-align:center; padding:14px; background:rgba(0,0,0,.82); }
+  #overlay.hidden { display:none; }
+  #overlay h1 { font-size:46px; font-weight:900; letter-spacing:.06em; color:#ffd27f; text-shadow:0 3px 0 #8a5a1a; }
+  #overlay h2 { font-size:24px; font-weight:900; }
+  #overlay p { font-size:13px; color:#e6e6e6; line-height:1.6; }
+  #overlay .big { font-size:18px; font-weight:800; color:#ffd23a; }
+  #overlay .help { font-size:12px; color:#bdbdbd; line-height:1.7; }
+  #overlay button { margin-top:6px; background:linear-gradient(180deg,#ffe9b8,#e8a83a); color:#2a1800; font-weight:900; font-size:17px; border:none; border-radius:999px; padding:12px 34px; box-shadow:0 4px 0 #8a5a1a; cursor:pointer; }
+  #overlay button:active { transform:translateY(3px); box-shadow:0 1px 0 #8a5a1a; }
+  #overlay .lv { display:flex; gap:10px; margin-top:6px; }
+  #overlay .lv button { margin-top:0; padding:10px 18px; font-size:16px; }
+  #overlay .lv small { display:block; font-size:10px; font-weight:600; opacity:.75; margin-top:2px; }
+  #overlay button.sub { background:rgba(255,255,255,.12); color:#fff; box-shadow:none; border:2px solid rgba(255,255,255,.3); }
+  #overlay button:disabled { opacity:.4; }
+  #overlay h2 { margin:0; }
+  #overlay .note { font-size:11px; color:#aab; }
+  #top { position:absolute; right:3px; top:2px; display:flex; gap:6px; z-index:2; }
+  #top button { position:relative; background:rgba(0,0,0,.55); border:1px solid rgba(255,255,255,.25); color:#fff; width:30px; height:30px; border-radius:8px; font-size:13px; cursor:pointer; }
+  #top button::after { content:''; position:absolute; inset:-7px -4px; }
+  /* 화면: 상대 정보 · 탁자(묶음들) · 안내 · 내 타일 · 버튼 */
+  #wrap { width:100%; max-width:440px; display:flex; flex-direction:column; gap:6px; height:100%; max-height:calc(100vh - 12px); }
+  #opps { display:flex; gap:6px; justify-content:center; }
+  .opp { flex:1; background:rgba(255,255,255,.08); border-radius:10px; padding:5px 6px; text-align:center; font-size:12px; font-weight:700; border:2px solid transparent; }
+  .opp small { display:block; font-weight:600; opacity:.8; font-size:11px; }
+  .opp.turn { border-color:#ffd23a; background:rgba(255,210,58,.18); }
+  #table { flex:1 1 auto; min-height:120px; overflow-y:auto; background:#0d5a3a; border:3px solid #6a4a22; border-radius:12px; padding:6px; display:flex; flex-wrap:wrap; align-content:flex-start; gap:6px; }
+  .set { display:flex; align-items:center; gap:2px; background:rgba(0,0,0,.18); border:2px solid rgba(255,255,255,.2); border-radius:8px; padding:3px; }
+  .set.bad { border-color:#ff6a6a; background:rgba(255,80,80,.18); }
+  .set.flash { border-color:#ffd23a; }
+  .set .add { width:20px; height:36px; border-radius:6px; border:1px dashed rgba(255,255,255,.4); background:transparent; color:#fff; font-size:14px; padding:0; }
+  .tile { width:26px; height:36px; border-radius:5px; background:#f4eed8; border:1px solid #888; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:17px; cursor:pointer; position:relative; user-select:none; box-shadow:0 2px 0 #b9ae8a; }
+  .tile.c0 { color:#111; } .tile.c1 { color:#1a5ad8; } .tile.c2 { color:#d82a2a; } .tile.c3 { color:#e8860a; } .tile.joker { color:#a02ad8; font-size:20px; }
+  .tile.sel { transform:translateY(-5px); outline:3px solid #ffd23a; }
+  .tile.fresh::after { content:''; position:absolute; right:1px; top:1px; width:6px; height:6px; border-radius:50%; background:#2ad84a; }
+  .tile.pulse { animation:pulse 1.2s; }
+  @keyframes pulse { 0%,100% { box-shadow:0 2px 0 #b9ae8a; } 30% { box-shadow:0 0 0 4px #ffd23a; } }
+  #msg { min-height:18px; text-align:center; font-size:13px; font-weight:700; color:#ffe9a8; }
+  #msg.err { color:#ff9a9a; }
+  #rackWrap { background:#6a4a22; border-radius:12px; padding:6px; border:3px solid #4a3216; }
+  #rack { display:flex; flex-wrap:wrap; gap:4px; min-height:40px; }
+  #rackWrap .tile { width:28px; height:40px; font-size:19px; }
+  #controls { display:flex; flex-direction:column; gap:6px; width:100%; }
+  #controls .row { display:flex; gap:6px; }
+  #controls button { flex:1; height:42px; border-radius:12px; border:2px solid rgba(255,255,255,.25); background:rgba(255,255,255,.1); color:#fff; font-size:13px; font-weight:800; touch-action:manipulation; padding:0 2px; }
+  #controls button:disabled { opacity:.35; }
+  #btnDone { flex:1.6; background:linear-gradient(180deg,#8ae8a8,#2a9a52); } #btnNew { background:linear-gradient(180deg,#9ac8ff,#2a6ac4); }
+  #btnDraw { background:linear-gradient(180deg,#ffd98a,#d89a2a); color:#2a1a00; } #btnHint { background:linear-gradient(180deg,#d8b0ff,#7a4ac4); }
+  #btnNextRound { background:linear-gradient(180deg,#9ac8ff,#2a6ac4); }
+  .hidden { display:none !important; }
+  #top { position:fixed; right:6px; top:4px; z-index:5; }
+  #overlay { z-index:6; position:fixed; inset:0; }
+  #overlay .lv { display:flex; gap:10px; margin-top:6px; }
+  #overlay .lv button { margin-top:0; padding:10px 18px; font-size:16px; }
+  #overlay .lv small { display:block; font-size:10px; font-weight:600; opacity:.75; margin-top:2px; }
+  #overlay .note { font-size:11px; color:#aab; }
+  .pc { display:inline; } .touch { display:none; }
+  @media (pointer:coarse) { .pc { display:none; } .touch { display:inline; } }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="wrap">
+    <div id="opps"></div>
+    <div id="table"></div>
+    <div id="msg"></div>
+    <div id="rackWrap"><div id="rack"></div></div>
+    <div id="controls">
+      <div class="row"><button id="btnNew">새 묶음</button><button id="btnBack">타일 되돌리기</button><button id="btnUndo">모두 되돌리기</button><button id="btnSort">정렬</button></div>
+      <div class="row"><button id="btnHint">추천</button><button id="btnDraw">타일 뽑기<br><small>넘기기</small></button><button id="btnDone">끝내기</button><button id="btnNextRound" class="hidden">다음 판</button></div>
+    </div>
+    <div id="top">
+      <button id="muteBtn" title="소리 (M)">🔊</button>
+      <button id="pauseBtn" title="일시정지 (P)">⏸</button>
+    </div>
+    <div id="overlay">
+      <h1>숫자 타일<br>게임</h1>
+      <p>같은 숫자 3~4장이나 같은 색 연속 3장 이상으로 <b>묶음</b>을 만들어<br>내 타일을 <b>먼저 다 내려놓으면</b> 이겨요! 🔢</p>
+      <div class="help">
+        <span class="pc">⌨️ 타일을 눌러 고른 뒤 버튼으로 옮겨요 · Enter 끝내기 · D 뽑기 · U 되돌리기</span>
+        <span class="touch">👆 타일을 눌러 고른 뒤 아래 버튼으로 옮겨요</span>
+      </div>
+      <div class="lv"><button id="startBtn" data-level="easy">쉬움<small>컴퓨터가 서툴러요</small></button><button id="startBtn2" data-level="normal">보통<small>컴퓨터가 능숙해요</small></button></div>
+    </div>
+  </div>
+</div>
+<script src="logic.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
