@@ -97,6 +97,13 @@ const LOGIC_NUMTILES = (() => {
     const played = flat.filter((id) => mine.has(id));
     if (!played.length) return { ok: false, why: '내 타일을 한 장 이상 내야 해요' };
     for (const set of arrangement) if (!isValidSet(set)) return { ok: false, why: '맞지 않는 묶음이 있어요', bad: set };
+    // 공식 규칙: 탁자에서 조커를 가져왔으면(원래 묶음을 떠났으면) 반드시 '새 묶음'에 써야 한다. 이미 놓인 다른 묶음에 붙이는 것은 안 된다
+    for (const set0 of st.table) for (const jk of set0.filter(isJoker)) {
+      const final = arrangement.find((s) => s.includes(jk));
+      const others = set0.filter((x) => x !== jk);
+      if (others.every((x) => final.includes(x))) continue;                 // 원래 묶음에 그대로 남아 있음 (늘어나도 됨)
+      for (const t of st.table) if (t !== set0 && t.every((x) => final.includes(x))) return { ok: false, why: '탁자에서 가져온 조커는 새 묶음에 써야 해요 (이미 있는 묶음에 붙일 수 없어요)', bad: final };
+    }
     if (!p.opened) {
       // 처음 내기: 탁자의 묶음은 그대로 두고, 내 타일만으로 만든 새 묶음의 합이 30 이상이어야 한다
       const old = st.table.map((s) => s.slice().sort((a, b) => a - b).join(','));

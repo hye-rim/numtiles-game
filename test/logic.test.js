@@ -191,3 +191,15 @@ test('whole computer games never break the rules: 106 tiles accounted for, every
     assert.strictEqual(st.phase, 'matchover');
   }
 });
+
+test('a joker taken from the table must go into a new set, not onto a set that is already there', () => {
+  const stays = setup(S('bl4 bu1'), [S('bl5 J bl7')], [true, false, false, false]);
+  assert.ok(L.check(stays, 0, [S('bl4 bl5 J bl7')]).ok, 'a joker that stays in its own set may be extended');
+  const onto = setup(S('bl6 bu1'), [S('bl5 J bl7'), S('bu9 rd9 or9')], [true, false, false, false]);
+  const bad = L.check(onto, 0, [S('bl5 bl6 bl7'), S('bu9 rd9 or9 J')]);
+  assert.strictEqual(bad.ok, false); assert.ok(/새 묶음/.test(bad.why), 'moving it onto an existing group is refused');
+  const fresh2 = setup(S('bl6 bu9 rd9'), [S('bl5 J bl7')], [true, false, false, false]);
+  assert.ok(L.check(fresh2, 0, [S('bl5 bl6 bl7'), S('bu9 rd9 J')]).ok, 'a new set from the rack is fine');
+  const split = setup(S('bl6 bu8 rd8 bu1'), [S('bl4 bl5 J bl7 bl8 bl9')], [true, false, false, false]);
+  assert.ok(L.check(split, 0, [S('bl4 bl5 bl6'), S('bl7 bl8 bl9'), S('bu8 rd8 J')]).ok, 'replace the joker by the real tile and use the joker in a new group');
+});
